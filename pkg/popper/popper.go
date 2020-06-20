@@ -35,6 +35,7 @@ func NewPopper(r io.Reader) *DefaultPopper {
 }
 
 func (pr *DefaultPopper) Read(p []byte) (n int, err error) {
+	// todo: buffer these reads
 	return pr.Reader.Read(p)
 }
 
@@ -49,5 +50,7 @@ type poppingReader struct {
 }
 
 func (pr *poppingReader) Read(p []byte) (n int, err error) {
+	// todo: when we hit EOF on pr.Reader, switch to
+	// the buffer and somehow pipe remaing reads here
 	return pr.Reader.Read(p)
 }
