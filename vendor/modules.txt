@@ -1,3 +1,6 @@
+# github.com/fortytw2/leaktest v1.3.0
+## explicit
+github.com/fortytw2/leaktest
 # github.com/kr/text v0.1.0
 github.com/kr/text
 # github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e
