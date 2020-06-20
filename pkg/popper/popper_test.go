@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -108,7 +109,9 @@ func (s *PopperSuite) TestNew(c *check.C) {
 	// Read from popper.
 	b, err := ioutil.ReadAll(pReader)
 	c.Assert(err, check.IsNil)
-	log.Printf(string(b))
+	lines := strings.Split(string(b), "\n")
+	lastLine := lines[len(lines)-2]
+	log.Printf("Last line: %s", lastLine)
 
 	// Wait for writing to complete
 	now := time.Now()
