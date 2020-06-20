@@ -1,7 +1,6 @@
 package popper
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,16 +14,22 @@ import (
 	"gopkg.in/check.v1"
 )
 
-type PopperSuite struct{}
+type PopperSuite struct {
+	dir string
+}
 
 var _ = check.Suite(new(PopperSuite))
 
 func Test(t *testing.T) { check.TestingT(t) }
 
 func (s *PopperSuite) SetUpSuite(c *check.C) {
+	var err error
+	s.dir, err = ioutil.TempDir("", "")
+	c.Assert(err, check.IsNil)
 }
 
 func (s *PopperSuite) TearDownSuite(c *check.C) {
+	c.Assert(os.RemoveAll(s.dir), check.IsNil)
 }
 
 func (s *PopperSuite) SetUpTest(c *check.C) {
@@ -33,51 +38,81 @@ func (s *PopperSuite) SetUpTest(c *check.C) {
 func (s *PopperSuite) TearDownTest(c *check.C) {
 }
 
+type SlowReader struct {
+	reader io.Reader
+	delay  time.Duration
+}
+
+func (s *SlowReader) Read(p []byte) (n int, err error) {
+	time.Sleep(s.delay)
+	return s.reader.Read(p)
+}
+
+func (s *PopperSuite) makeSourceFile(c *check.C) string {
+	// Make a test file for the slow reader
+	fSource := filepath.Join(s.dir, "test.source")
+	func() {
+		fS, err := os.Create(fSource)
+		c.Assert(err, check.IsNil)
+		defer fS.Close()
+		for i := 0; i < 1000; i++ {
+			fS.WriteString(fmt.Sprintf("this is line %d\n", i))
+		}
+	}()
+	return fSource
+}
 func (s *PopperSuite) TestNew(c *check.C) {
 	defer leaktest.Check(c)
 
-	dir, err := ioutil.TempDir("", "")
+	// Make a test file for the slow reader, and
+	// open it for reading. Normally, this reader
+	// would be something like a response Body.
+	fSource := s.makeSourceFile(c)
+	fReadSource, err := os.Open(fSource)
 	c.Assert(err, check.IsNil)
-	defer os.RemoveAll(dir)
+	defer fReadSource.Close()
 
-	fName := filepath.Join(dir, "test.write")
-	fW, err := os.Create(fName)
+	// Open a new destination file to write to
+	fDestName := filepath.Join(s.dir, "test.write")
+	fDest, err := os.Create(fDestName)
 	c.Assert(err, check.IsNil)
-	defer fW.Close()
+	defer fDest.Close()
 
-	// slowly write to file
+	// Create a new popper
+	poppingReader := NewPopper(fReadSource)
+
+	// Slowly read and copy to the new file. Each read will be
+	// delayed by 1ms. Use a small buffer so we need to read in
+	// many chunks
 	done := make(chan struct{})
 	go func() {
-		for i := 0; i < 1000; i++ {
-			fW.WriteString(fmt.Sprintf("this is line %d\n", i))
-			time.Sleep(1 * time.Millisecond)
-		}
+		_, err = io.CopyBuffer(fDest, &SlowReader{
+			reader: poppingReader,
+			delay:  time.Millisecond,
+		}, make([]byte, 64))
+		c.Assert(err, check.IsNil)
 		close(done)
 	}()
 
-	// Wait for writing to start
-	time.Sleep(100 * time.Millisecond)
+	// Wait a bit for writing to start
+	time.Sleep(30 * time.Millisecond)
 
-	fR, err := os.Open(fName)
+	// Open destination file before we complete writing to it
+	fR, err := os.Open(fDestName)
 	c.Assert(err, check.IsNil)
 	defer fR.Close()
 
-	// Read from file. This will be faster than the write,
-	// so we will hit an EOF before we are done writing
-	// to the file, but we don't know exactly where/when.
-	bufR := bufio.NewReader(fR)
-	for {
-		line, _, err := bufR.ReadLine()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			log.Printf("Error: %s", err)
-		}
-		log.Printf("%s", string(line))
-		time.Sleep(500 * time.Microsecond)
-	}
+	// Get a new reader from popper
+	pReader := poppingReader.NewReader(fR)
+
+	// Read from popper.
+	b, err := ioutil.ReadAll(pReader)
+	c.Assert(err, check.IsNil)
+	log.Printf(string(b))
 
 	// Wait for writing to complete
+	now := time.Now()
+	log.Printf("Done reading from file")
 	<-done
+	log.Printf("Done copying to file %dms later", time.Now().Sub(now).Milliseconds())
 }
