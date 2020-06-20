@@ -8,11 +8,12 @@ import "io"
 // 2. Create a popper with:
 //      pr := NewPopper(resp.Body)
 // 3. Write to a file with:
+//      dst, _ := os.Create(dstFilePath)
 //      io.Copy(dst, pr)
 // 4. A new consumer needs to read while still writing:
-//      r := pr.NewReader()
+//      f, _ := os.Open(dstFilePath)
+//      r := pr.NewReader(f)
 //      io.Copy(dst, r)
-//
 
 type Popper interface {
 	io.Reader
