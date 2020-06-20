@@ -56,7 +56,7 @@ func (s *PopperSuite) makeSourceFile(c *check.C) string {
 		c.Assert(err, check.IsNil)
 		defer fS.Close()
 		for i := 0; i < 1000; i++ {
-			fS.WriteString(fmt.Sprintf("this is line %d\n", i))
+			fS.WriteString(fmt.Sprintf("Here is %3d\n", i))
 		}
 	}()
 	return fSource
@@ -89,13 +89,13 @@ func (s *PopperSuite) TestNew(c *check.C) {
 		_, err = io.CopyBuffer(fDest, &SlowReader{
 			reader: poppingReader,
 			delay:  time.Millisecond,
-		}, make([]byte, 64))
+		}, make([]byte, 48))
 		c.Assert(err, check.IsNil)
 		close(done)
 	}()
 
 	// Wait a bit for writing to start
-	time.Sleep(30 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	// Open destination file before we complete writing to it
 	fR, err := os.Open(fDestName)
