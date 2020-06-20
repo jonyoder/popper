@@ -34,6 +34,10 @@ func NewPopper(r io.Reader) *DefaultPopper {
 	}
 }
 
+func (pr *DefaultPopper) Read(p []byte) (n int, err error) {
+	return pr.Reader.Read(p)
+}
+
 func (p *DefaultPopper) NewReader(r io.Reader) io.Reader {
 	return &poppingReader{
 		Reader: r,
