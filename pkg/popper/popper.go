@@ -19,6 +19,10 @@ type Popper interface {
 	NewReader(r io.Reader) io.Reader
 }
 
+type PoppingReader interface {
+	io.Reader
+}
+
 type DefaultPopper struct {
 	io.Reader
 }
@@ -30,5 +34,15 @@ func NewPopper(r io.Reader) *DefaultPopper {
 }
 
 func (p *DefaultPopper) NewReader(r io.Reader) io.Reader {
-	return r
+	return &poppingReader{
+		Reader: r,
+	}
+}
+
+type poppingReader struct {
+	io.Reader
+}
+
+func (pr *poppingReader) Read(p []byte) (n int, err error) {
+	return pr.Reader.Read(p)
 }
